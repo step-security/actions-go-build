@@ -30,7 +30,12 @@ jobs:
           - { assert: failure, file: this-file-does-not-exist,            when: result file is missing }
           - { assert: failure, file: corrupt,                             when: result file is corrupt }
     steps:
-      - uses: actions/checkout@v7
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # generate a random ID; GH doesn't provide a proper job ID (especially for matrix jobs)
       - name: Generate random ID to distinguish build artifacts
         run: echo "ARTIFACT_ID=$RANDOM" >> "$GITHUB_ENV"

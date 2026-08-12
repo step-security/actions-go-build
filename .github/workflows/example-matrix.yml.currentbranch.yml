@@ -13,7 +13,12 @@ jobs:
           - { runner: ubuntu-latest, os: linux,   arch: arm64, env:  CGO_ENABLED=0 }
           - { runner: ubuntu-latest, os: windows, arch: amd64, env:  CGO_ENABLED=0 }
     steps:
-      - uses: actions/checkout@v7
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         uses: ./
         with:

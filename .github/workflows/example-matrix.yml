@@ -12,9 +12,14 @@ jobs:
           - { runner: ubuntu-latest, os: linux,   arch: arm64, env:  CGO_ENABLED=0 }
           - { runner: ubuntu-latest, os: windows, arch: amd64, env:  CGO_ENABLED=0 }
     steps:
-      - uses: actions/checkout@v7
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
-        uses: hashicorp/actions-go-build@v1
+        uses: hashicorp/actions-go-build@dd7ca5a30c402c933e1fe61e0ff7165e5c4ee9e4 # v1.1.2
         with:
           product_name: example-app
           product_version: 1.2.3

@@ -1,0 +1,129 @@
+# Copyright IBM Corp. 2022, 2025
+# Copyright StepSecurity 2026
+# SPDX-License-Identifier: MPL-2.0
+
+name: Go Build Action Self-Tests
+author: Release Engineering <team-rel-eng@hashicorp.com>
+description: Action for testing hashicorp/actions-go-build.
+
+inputs:
+  # Test parameters.
+  when:
+    description: A sentence fragment describing the scenario. E.g. 'the worzels are singing'.
+    required: true
+  assert:
+    description: Either 'success' or 'failure' to indicate if we expect the action to succeed or fail.
+    required: true
+
+  # Action under test configuration.
+  instructions:
+    description: Build instructions to use.
+    required: true
+  reproducible:
+    description: Passed through to action.
+    default: assert
+    required: false
+  product_name:
+    description: Passed through to action.
+    default: example-app
+    required: false
+  product_version:
+    description: Passed through to action.
+    default: 1.0.0
+    required: false
+  go_version:
+    description: Passed through to action.
+    default: 1.24
+    required: false
+  os:
+    description: Passed through to action.
+    default: linux
+    required: false
+  arch:
+    description: Passed through to action.
+    default: amd64
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Subscription check
+      env:
+        REPO_PRIVATE: ${{ github.event.repository.private }}
+      run: |
+        # validate subscription status
+        UPSTREAM="hashicorp/actions-go-build"
+        ACTION_REPO="${GITHUB_ACTION_REPOSITORY:-}"
+        DOCS_URL="https://docs.stepsecurity.io/actions/stepsecurity-maintained-actions"
+
+        echo ""
+        echo -e "\033[1;36mStepSecurity Maintained Action\033[0m"
+        echo "Secure drop-in replacement for $UPSTREAM"
+        if [ "$REPO_PRIVATE" = "false" ]; then
+          echo -e "\033[32m✓ Free for public repositories\033[0m"
+        fi
+        echo -e "\033[36mLearn more:\033[0m $DOCS_URL"
+        echo ""
+
+        if [ "$REPO_PRIVATE" != "false" ]; then
+          SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
+
+          if [ "$SERVER_URL" != "https://github.com" ]; then
+            BODY=$(printf '{"action":"%s","ghes_server":"%s"}' "$ACTION_REPO" "$SERVER_URL")
+          else
+            BODY=$(printf '{"action":"%s"}' "$ACTION_REPO")
+          fi
+
+          API_URL="https://agent.api.stepsecurity.io/v1/github/$GITHUB_REPOSITORY/actions/maintained-actions-subscription"
+
+          RESPONSE=$(curl --max-time 3 -s -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "$API_URL" -o /dev/null) && CURL_EXIT_CODE=0 || CURL_EXIT_CODE=$?
+
+          if [ $CURL_EXIT_CODE -ne 0 ]; then
+            echo "Timeout or API not reachable. Continuing to next step."
+          elif [ "$RESPONSE" = "403" ]; then
+            echo -e "::error::\033[1;31mThis action requires a StepSecurity subscription for private repositories.\033[0m"
+            echo -e "::error::\033[31mLearn how to enable a subscription: $DOCS_URL\033[0m"
+            exit 1
+          fi
+        fi
+      shell: bash
+    - if: inputs.assert != 'success' && inputs.assert != 'failure'
+      shell: bash
+      run: |
+        echo "assert must be one of: 'success' or 'failure'"
+        exit 1
+    - name: Delete the .git directory
+      shell: bash
+      run: |
+        # Delete .git because it is not present when this action is
+        # called from external repos, so this ensures our test env is
+        # as similar as possible to when third parties use it.
+        rm -rf .git
+    - name: Invoke actions-go-build when ${{ env.WHEN }}
+      id: build
+      uses: ./ # The action at the root of this repo.
+      with:
+        product_name: ${{ inputs.product_name }}
+        product_version: ${{ inputs.product_version }}
+        go_version: ${{ inputs.go_version }}
+        os: ${{ inputs.os }}
+        arch: ${{ inputs.arch }}
+        reproducible: ${{ inputs.reproducible }}
+        instructions: ${{ inputs.instructions }}
+      continue-on-error: true
+    - if: inputs.assert == 'success'
+      name: Assert The Action Succeeded
+      shell: bash
+      env:
+        WHEN: ${{ inputs.when }}
+      run: ./scripts/gha_assert_success "${{ steps.build.outcome }}"
+    - if: inputs.assert == 'failure'
+      name: Assert The Action Failed Correctly
+      shell: bash
+      env:
+        WHEN: ${{ inputs.when }}
+      run: ./scripts/gha_assert_failure "${{ steps.build.outcome }}"

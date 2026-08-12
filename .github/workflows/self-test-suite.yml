@@ -1,0 +1,185 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: The name of the runner to use.
+        type: string
+        required: true
+
+jobs:
+
+  # Begin action tests.
+  #
+  # These tests use a matrix to define a set of inputs and wanted results.
+  # They use the ./self-test action in this repo to exercise the action itself
+  # with different sets of inputs, and assert that the action succeeds or
+  # fails correctly.
+
+  # Each test uses a distinct product_name that must account for both the job name
+  # and the variants introduced via job matrix in order to avoid duplicate artifact
+  # names (which cannot be uploaded as of actions/upload-artifact@v4.
+
+  # A single reproducible go binary.
+  ok-single-file:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { reproducible: assert, want: success }
+          - { reproducible: report, want: success }
+          - { reproducible: nope,   want: success }
+    steps:
+      - uses: actions/checkout@v7
+      - name: select OS value
+        run: case "${{ runner.os }}" in macOS) echo "SELECTED_OS=darwin" >> "$GITHUB_ENV" ;; Linux) echo "SELECTED_OS=linux" >> "$GITHUB_ENV" ;; esac
+      - uses: ./self-test
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ env.SELECTED_OS }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "the binary files are identical and there are no other files in the zip"
+          instructions: |
+            cd testdata/example-app
+            go build -o "$BIN_PATH" -trimpath
+
+  # A single reproducible go binary along with other reproducible files.
+  ok-multi-file:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { reproducible: assert, want: success }
+          - { reproducible: report, want: success }
+          - { reproducible: nope,   want: success }
+    steps:
+      - uses: actions/checkout@v7
+      - name: select OS value
+        run: case "${{ runner.os }}" in macOS) echo "SELECTED_OS=darwin" >> "$GITHUB_ENV" ;; Linux) echo "SELECTED_OS=linux" >> "$GITHUB_ENV" ;; esac
+      - uses: ./self-test
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ env.SELECTED_OS }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "the binary files are identical and so are two other files in the zip"
+          instructions: |
+            cd testdata/example-app
+            go build -o "$BIN_PATH" -trimpath
+            echo "Hello world." > "$TARGET_DIR/another-file.txt"
+            echo "A fake license." > "$TARGET_DIR/LICENSE"
+
+  # A single reproducible go binary using netcgo on darwin.
+  # This test is macOS-specific, so each step has to have
+  #   if: runner.os == 'macOS'
+  # (You can't check the runner type at whole job level.)
+  ok-darwin-netcgo:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # We want to explicitly test both amd64 and arm64 here.
+          - { reproducible: assert, os: darwin, arch: amd64, want: success }
+          - { reproducible: report, os: darwin, arch: amd64, want: success }
+          - { reproducible: nope,   os: darwin, arch: amd64, want: success }
+          - { reproducible: assert, os: darwin, arch: arm64, want: success }
+          - { reproducible: report, os: darwin, arch: arm64, want: success }
+          - { reproducible: nope,   os: darwin, arch: arm64, want: success }
+    steps:
+      - uses: actions/checkout@v7
+        if: runner.os == 'macOS'
+      - uses: ./self-test
+        if: runner.os == 'macOS'
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ matrix.os }}
+          arch: ${{ matrix.arch }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "the binary files are identical and so are two other files downloaded into the zip"
+          instructions: |
+            cd testdata/example-app
+            go build -o "$BIN_PATH" -trimpath -tags=netcgo
+
+  # Test cases where the binary reproduces but the zip file does not.
+  err-zip-mismatch:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { reproducible: assert, want: failure }
+          - { reproducible: report, want: success }
+          - { reproducible: nope,   want: success }
+    steps:
+      - uses: actions/checkout@v7
+      - name: select OS value
+        run: case "${{ runner.os }}" in macOS) echo "SELECTED_OS=darwin" >> "$GITHUB_ENV" ;; Linux) echo "SELECTED_OS=linux" >> "$GITHUB_ENV" ;; esac
+      - uses: ./self-test
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ env.SELECTED_OS }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "the binary files reproduce but the zip files do not"
+          instructions: |
+            cd testdata/example-app
+            go build -o "$BIN_PATH" -trimpath
+            # Insert something random into the zipped dir.
+            head -c100 < /dev/urandom > "$TARGET_DIR/random.bytes"
+
+  # Test cases where the binary and zip file both do not reproduce.
+  err-bin-mismatch:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { reproducible: assert, want: failure }
+          - { reproducible: report, want: success }
+          - { reproducible: nope,   want: success }
+    steps:
+      - uses: actions/checkout@v7
+      - name: select OS value
+        run: case "${{ runner.os }}" in macOS) echo "SELECTED_OS=darwin" >> "$GITHUB_ENV" ;; Linux) echo "SELECTED_OS=linux" >> "$GITHUB_ENV" ;; esac
+      - uses: ./self-test
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ env.SELECTED_OS }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "neither the binary file not the zip file reproduce"
+          instructions: |
+            cd testdata/example-app
+            # Don't use -trimpath so we get different binaries.
+            go build -o "$BIN_PATH"
+
+  # Test cases where the binary file is not written to the correct path.
+  err-bin-missing:
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { reproducible: assert, want: failure }
+          - { reproducible: report, want: failure }
+          - { reproducible: nope,   want: failure }
+    steps:
+      - uses: actions/checkout@v7
+      - name: select OS value
+        run: case "${{ runner.os }}" in macOS) echo "SELECTED_OS=darwin" >> "$GITHUB_ENV" ;; Linux) echo "SELECTED_OS=linux" >> "$GITHUB_ENV" ;; esac
+      - uses: ./self-test
+        with:
+          product_name: "example-app-${{ github.job }}-${{ matrix.reproducible }}"
+          os: ${{ env.SELECTED_OS }}
+          reproducible: ${{ matrix.reproducible }}
+          assert: ${{ matrix.want }}
+          when: "the binary file is not written to the correct path"
+          instructions: |
+            cd testdata/example-app
+            go build -o "$BIN_PATH.wrong" -trimpath

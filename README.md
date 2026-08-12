@@ -8,8 +8,6 @@ _**Build and package a (reproducible) Go binary.**_
 - **Assert** that it is reproducible (optionally).
 - **Use** the resultant artifacts in your workflow.
 
-_This is intended for internal HashiCorp use only; Internal folks please refer to RFC **ENGSRV-084** for more details._
-
 <!-- insert:dev/docs/table_of_contents -->
 * [Features](#features)
 * [Local Usage](#local-usage)

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# This script asserts that a GitHub Action step failed correctly.
+#
+# It assumes that the variable WHEN is a description of the condition being tested.
+# It assumes that its single arg is set to the ${{ steps.<step_id>.outcome }}
+# of the step being tested.
+
+set -Eeuo pipefail
+
+log() { echo "$*" 1>&2; }
+die() { log "$*"; exit 1; }
+
+[ "$1" = "failure" ] || die ":x: Action succeeded unexpectedly when ${WHEN}."
+log ":white_check_mark: Action failed correctly when ${WHEN}"

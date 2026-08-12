@@ -1,0 +1,17 @@
+name: Minimal Example (main)
+on: workflow_dispatch
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        uses: hashicorp/actions-go-build@v1
+        with:
+          go_version: 1.24
+          os: linux
+          arch: amd64
+          work_dir: testdata/example-app
+          debug: true
+          instructions: |
+            go build -o "$BIN_PATH" -trimpath -buildvcs=false

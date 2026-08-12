@@ -1,0 +1,102 @@
+# Copyright IBM Corp. 2022, 2025
+# Copyright StepSecurity 2026
+# SPDX-License-Identifier: MPL-2.0
+
+name: Go Build Verify Action Self-Tests
+author: step-security
+description: Action for testing step-security/actions-go-build/verify.
+
+inputs:
+  # Test parameters.
+  when:
+    description: A sentence fragment describing the scenario. E.g. 'the worzels are singing'.
+    required: true
+  assert:
+    description: Either 'success' or 'failure' to indicate if we expect the action to succeed or fail.
+    required: true
+
+  # Action under test configuration.
+  result_file:
+    description: Result file we're trying to verify.
+    required: true
+  debug:
+    description: Enable debug-level logging.
+    required: false
+  output_file:
+    description: The name of the file to write the verification result to.
+    required: false
+    default: verification-result.json
+
+runs:
+  using: composite
+  steps:
+    - name: Subscription check
+      env:
+        REPO_PRIVATE: ${{ github.event.repository.private }}
+      run: |
+        # validate subscription status
+        UPSTREAM="hashicorp/actions-go-build"
+        ACTION_REPO="${GITHUB_ACTION_REPOSITORY:-}"
+        DOCS_URL="https://docs.stepsecurity.io/actions/stepsecurity-maintained-actions"
+
+        echo ""
+        echo -e "\033[1;36mStepSecurity Maintained Action\033[0m"
+        echo "Secure drop-in replacement for $UPSTREAM"
+        if [ "$REPO_PRIVATE" = "false" ]; then
+          echo -e "\033[32m✓ Free for public repositories\033[0m"
+        fi
+        echo -e "\033[36mLearn more:\033[0m $DOCS_URL"
+        echo ""
+
+        if [ "$REPO_PRIVATE" != "false" ]; then
+          SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
+
+          if [ "$SERVER_URL" != "https://github.com" ]; then
+            BODY=$(printf '{"action":"%s","ghes_server":"%s"}' "$ACTION_REPO" "$SERVER_URL")
+          else
+            BODY=$(printf '{"action":"%s"}' "$ACTION_REPO")
+          fi
+
+          API_URL="https://agent.api.stepsecurity.io/v1/github/$GITHUB_REPOSITORY/actions/maintained-actions-subscription"
+
+          RESPONSE=$(curl --max-time 3 -s -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "$API_URL" -o /dev/null) && CURL_EXIT_CODE=0 || CURL_EXIT_CODE=$?
+
+          if [ $CURL_EXIT_CODE -ne 0 ]; then
+            echo "Timeout or API not reachable. Continuing to next step."
+          elif [ "$RESPONSE" = "403" ]; then
+            echo -e "::error::\033[1;31mThis action requires a StepSecurity subscription for private repositories.\033[0m"
+            echo -e "::error::\033[31mLearn how to enable a subscription: $DOCS_URL\033[0m"
+            exit 1
+          fi
+        fi
+      shell: bash
+
+    - if: inputs.assert != 'success' && inputs.assert != 'failure'
+      shell: bash
+      run: |
+        echo "assert must be one of: 'success' or 'failure'"
+        exit 1
+    - name: Invoke actions-go-build when ${{ env.WHEN }}
+      id: verify
+      uses: ./verify # The action at ./verify in this repo.
+      with:
+        result_file: ${{ inputs.result_file }}
+        output_file: ${{ inputs.output_file }}
+        debug: ${{ inputs.debug }}
+      continue-on-error: true
+    - if: inputs.assert == 'success'
+      name: Assert The Action Succeeded
+      shell: bash
+      env:
+        WHEN: ${{ inputs.when }}
+      run: ./scripts/gha_assert_success "${{ steps.verify.outcome }}"
+    - if: inputs.assert == 'failure'
+      name: Assert The Action Failed Correctly
+      shell: bash
+      env:
+        WHEN: ${{ inputs.when }}
+      run: ./scripts/gha_assert_failure "${{ steps.verify.outcome }}"

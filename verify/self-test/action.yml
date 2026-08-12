@@ -4,7 +4,7 @@
 
 name: Go Build Verify Action Self-Tests
 author: step-security
-description: Action for testing hashicorp/actions-go-build/verify.
+description: Action for testing step-security/actions-go-build/verify.
 
 inputs:
   # Test parameters.
@@ -74,7 +74,7 @@ runs:
           fi
         fi
       shell: bash
-      
+
     - if: inputs.assert != 'success' && inputs.assert != 'failure'
       shell: bash
       run: |

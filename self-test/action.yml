@@ -4,7 +4,7 @@
 
 name: Go Build Action Self-Tests
 author: step-security
-description: Action for testing hashicorp/actions-go-build.
+description: Action for testing step-security/actions-go-build.
 
 inputs:
   # Test parameters.

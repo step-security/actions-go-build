@@ -29,12 +29,6 @@ _This is intended for internal HashiCorp use only; Internal folks please refer t
 - **Reproducibility** is checked at build time.
 - **Fast feedback** if accidental nondeterminism is introduced.
 
-## Local Usage
-
-The core functionality of this action is contained in a Go CLI, which
-you can also install and use locally. See [the CLI docs](docs/cli.md)
-for more.
-
 ## Usage in GHA
 
 This Action can run on both Ubuntu and macOS runners.
@@ -44,8 +38,6 @@ This Action can run on both Ubuntu and macOS runners.
 #### Minimal(ish) Example
 
 This example shows building a single `linux/amd64` binary.
-
-[See this simple example workflow running here](https://github.com/step-security/actions-go-build/actions-reproducible-build/actions/workflows/example.yml).
 
 <!-- insert:dev/docs/print_example_workflow example.yml -->
 ```yaml
@@ -75,8 +67,6 @@ This example shows usage of the action inside a matrix configured to produce
 binaries for different platforms. It also injects the version, revision, and
 revision time into the binary via `-ldflags`, uses the `netcgo` tag for darwin,
 and disables CGO for linux and windows builds.
-
-[See this matrix example workflow running here](https://github.com/step-security/actions-go-build/actions-reproducible-build/actions/workflows/example-matrix.yml).
 
 <!-- insert:dev/docs/print_example_workflow example-matrix.yml -->
 ```yaml
@@ -279,8 +269,4 @@ turn this off using the `-buildvcs=false` flag.
 
 ## Development
 
-Development docs have moved to [docs/development.md](docs/development.md).
-
-The core functionality of this action is contained in a Go CLI, which can also be installed
-and run locally. See [the CLI docs](docs/cli.md) for instructions on installing and using
-the CLI.
+Development docs are present in [docs/development.md](docs/development.md).

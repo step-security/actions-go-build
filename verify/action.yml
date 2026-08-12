@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 name: Verify A Build Result
-author: Release Engineering <team-rel-eng@hashicorp.com>
+author: step-security
 description: Verify a reproducible build result.
 
 inputs:
